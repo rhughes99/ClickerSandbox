@@ -65,6 +65,17 @@ void McpAllOn(void);
 int  McpInit(void);
 void McpSendBytes(unsigned char byteA, unsigned char byteB);
 
+void DisplayNumber(int file, int guess);
+void SetUp0(int file);
+void SetUp1(int file);
+void SetUp2(int file);
+void SetUp3(int file);
+void SetUp4(int file);
+void SetUp5(int file);
+void SetUp6(int file);
+void SetUp7(int file);
+void SetUp8(int file);
+void SetUp9(int file);
 unsigned char running;
 
 //____________________
@@ -110,13 +121,13 @@ int main(int argc, char *argv[])
 	if ((file = open("/dev/i2c-2", O_RDWR)) < 0)
 	{
 		perror("*** Failed to open I2C bus dev file\n");
-		return 1;
+		return EXIT_FAILURE;
     }
 
 	if (ioctl(file, I2C_SLAVE, MATRIX_ADDR) < 0)
 	{
 		perror("*** Failed to connect to I2C device\n");
-		return 1;
+		return EXIT_FAILURE;
     }
 
 	// Internal system clock enable
@@ -204,62 +215,89 @@ int main(int argc, char *argv[])
 
                 case 11184813:						// 0xAAAAAD
 				case 19573421:						// 0x12AAAAD
+					tNow = Date.now();		// msec
+					tNow = date +%s%3N
+					
+					#include <time.h>
+					time_t currentTime;
+					currentTime = time(NULL);
+					printf("currentTime= %ld\n", currentTime);
+					
+					
+					#include <inttypes.h>
+					#include <math.h>
+					#include <stdio.h>
+					#include <time.h>
+
+					long ms;
+					time_t s;
+					struct timespec spec;
+					clock_gettime(CLOCK_REALTIME, &spec);
+					s = spec.tv_sec;
+					ms = round(spec.tv_nsec / 1.0e6); // Convert nanoseconds to milliseconds
+					if (ms >999) {
+						s++;
+						ms = 0;
+					}
+					printf("Current time: %"PRIdMAX".%03ld seconds since the Epoch\n",
+           (intmax_t)s, ms);
+					
                     printf("1\n");
-                    
+					DisplayNumber(file, 1);
                     break;
 
                 case 11184819:						// 0xAAAAB3
 				case 19573427:						// 0x12AAAB3
                     printf("2\n");
-					
+					DisplayNumber(file, 2);
                     break;
 
                 case 11184821:						// 0xAAAAB5
 				case 19573429:						// 0x12AAAB5
                     printf("3\n");
-                    
+					DisplayNumber(file, 3);
                     break;
 
                 case 11184843:						// 0xAAAACB
 				case 19573451:						// 0x12AAACB
                     printf("4\n");
-					
+					DisplayNumber(file, 4);
                     break;
 
                 case 11184845:						// 0xAAAACD
 				case 19573453:						// 0x12AAACD
                     printf("5\n");
-                    
+                    DisplayNumber(file, 5);
                     break;
 
                 case 11184851:						// 0xAAAAD3
 				case 19573459:						// 0x12AAAD3
                     printf("6\n");
-					
+					DisplayNumber(file, 6);
                     break;
 
                 case 11184853:						// 0xAAAAD5
 				case 19573461:						// 0x12AAAD5
                     printf("7\n");
-                    
+                    DisplayNumber(file, 7);
                     break;
 
                 case 11184939:						// 0xAAAB2B
 				case 19573547:						// 0x12AAB2B
                     printf("8\n");
-					
+					DisplayNumber(file, 8);
                     break;
 
                 case 11184941:						// 0xAAAB2D
 				case 19573549:						// 0x12AAB2D
                     printf("9\n");
-                    
+                    DisplayNumber(file, 9);
                     break;
 
                 case 11184811:						// 0xAAAAAB
 				case 19573419:						// 0x12AAAAB
                     printf("0\n");
-                    
+                    DisplayNumber(file, 0);
                     break;
 
                 case 11185491:						// 0xAAAD53
@@ -470,5 +508,214 @@ void McpSendBytes(unsigned char byteA, unsigned char byteB)
   mcpBuffer[0] = GPIOB;
   mcpBuffer[1] = byteB;
   write(mcp0, mcpBuffer, 2);	// GPIOB
+}
+
+//____________________
+void DisplayNumber(int file, int guess)
+{
+	if (guess >= 0 && guess <= 9)
+	switch (guess)
+	{
+		case 0:
+			SetUp0(file);	break;
+		case 1:
+			SetUp1(file);	break;
+		case 2:
+			SetUp2(file);	break;
+		case 3:
+			SetUp3(file);	break;
+		case 4:
+			SetUp4(file);	break;
+		case 5:
+			SetUp5(file);	break;
+		case 6:
+			SetUp6(file);	break;
+		case 7:
+			SetUp7(file);	break;
+		case 8:
+			SetUp8(file);	break;
+		case 9:
+			SetUp9(file);	break;
+	}
+}
+
+//____________________
+void SetUp0(int file)
+{
+	unsigned char i, dispBuffer[16];
+	for (i=0; i<16; i++)
+		dispBuffer[i] = 0;
+
+	dispBuffer[0x1] = 0x00;
+	dispBuffer[0x3] = 0x00;
+	dispBuffer[0x5] = 0x7F;
+	dispBuffer[0x7] = 0x41;
+	dispBuffer[0x9] = 0x41;
+	dispBuffer[0xB] = 0x41;
+	dispBuffer[0xD] = 0x7F;
+	dispBuffer[0xF] = 0x00;
+	write(file, dispBuffer, 16);
+}
+
+//____________________
+void SetUp1(int file)
+{
+	unsigned char i, dispBuffer[16];
+	for (i=0; i<16; i++)
+		dispBuffer[i] = 0;
+
+	dispBuffer[0x1] = 0x00;
+	dispBuffer[0x3] = 0x00;
+	dispBuffer[0x5] = 0x00;
+	dispBuffer[0x7] = 0x00;
+	dispBuffer[0x9] = 0x7F;
+	dispBuffer[0xB] = 0x02;
+	dispBuffer[0xD] = 0x00;
+	dispBuffer[0xF] = 0x00;
+	write(file, dispBuffer, 16);
+}
+
+//____________________
+void SetUp2(int file)
+{
+	unsigned char i, dispBuffer[16];
+	for (i=0; i<16; i++)
+		dispBuffer[i] = 0;
+
+	dispBuffer[0x1] = 0x00;
+	dispBuffer[0x3] = 0x00;
+	dispBuffer[0x5] = 0x4F;
+	dispBuffer[0x7] = 0x49;
+	dispBuffer[0x9] = 0x49;
+	dispBuffer[0xB] = 0x49;
+	dispBuffer[0xD] = 0x79;
+	dispBuffer[0xF] = 0x00;
+	write(file, dispBuffer, 16);
+}
+
+//____________________
+void SetUp3(int file)
+{
+	unsigned char i, dispBuffer[16];
+	for (i=0; i<16; i++)
+		dispBuffer[i] = 0;
+
+	dispBuffer[0x1] = 0x00;
+	dispBuffer[0x3] = 0x00;
+	dispBuffer[0x5] = 0x7F;
+	dispBuffer[0x7] = 0x49;
+	dispBuffer[0x9] = 0x49;
+	dispBuffer[0xB] = 0x49;
+	dispBuffer[0xD] = 0x41;
+	dispBuffer[0xF] = 0x00;
+	write(file, dispBuffer, 16);
+}
+
+//____________________
+void SetUp4(int file)
+{
+	unsigned char i, dispBuffer[16];
+	for (i=0; i<16; i++)
+		dispBuffer[i] = 0;
+
+	dispBuffer[0x1] = 0x00;
+	dispBuffer[0x3] = 0x00;
+	dispBuffer[0x5] = 0x7F;
+	dispBuffer[0x7] = 0x08;
+	dispBuffer[0x9] = 0x08;
+	dispBuffer[0xB] = 0x08;
+	dispBuffer[0xD] = 0x0F;
+	dispBuffer[0xF] = 0x00;
+	write(file, dispBuffer, 16);
+}
+
+//____________________
+void SetUp5(int file)
+{
+	unsigned char i, dispBuffer[16];
+	for (i=0; i<16; i++)
+		dispBuffer[i] = 0;
+
+	dispBuffer[0x1] = 0x00;
+	dispBuffer[0x3] = 0x00;
+	dispBuffer[0x5] = 0x79;
+	dispBuffer[0x7] = 0x49;
+	dispBuffer[0x9] = 0x49;
+	dispBuffer[0xB] = 0x49;
+	dispBuffer[0xD] = 0x4F;
+	dispBuffer[0xF] = 0x00;
+	write(file, dispBuffer, 16);
+}
+
+//____________________
+void SetUp6(int file)
+{
+	unsigned char i, dispBuffer[16];
+	for (i=0; i<16; i++)
+		dispBuffer[i] = 0;
+
+	dispBuffer[0x1] = 0x00;
+	dispBuffer[0x3] = 0x00;
+	dispBuffer[0x5] = 0x79;
+	dispBuffer[0x7] = 0x49;
+	dispBuffer[0x9] = 0x49;
+	dispBuffer[0xB] = 0x49;
+	dispBuffer[0xD] = 0x7F;
+	dispBuffer[0xF] = 0x00;
+	write(file, dispBuffer, 16);
+}
+
+//____________________
+void SetUp7(int file)
+{
+	unsigned char i, dispBuffer[16];
+	for (i=0; i<16; i++)
+		dispBuffer[i] = 0;
+
+	dispBuffer[0x1] = 0x00;
+	dispBuffer[0x3] = 0x00;
+	dispBuffer[0x5] = 0x07;
+	dispBuffer[0x7] = 0x09;
+	dispBuffer[0x9] = 0x71;
+	dispBuffer[0xB] = 0x01;
+	dispBuffer[0xD] = 0x01;
+	dispBuffer[0xF] = 0x00;
+	write(file, dispBuffer, 16);
+}
+
+//____________________
+void SetUp8(int file)
+{
+	unsigned char i, dispBuffer[16];
+	for (i=0; i<16; i++)
+		dispBuffer[i] = 0;
+
+	dispBuffer[0x1] = 0x00;
+	dispBuffer[0x3] = 0x00;
+	dispBuffer[0x5] = 0x7F;
+	dispBuffer[0x7] = 0x49;
+	dispBuffer[0x9] = 0x49;
+	dispBuffer[0xB] = 0x49;
+	dispBuffer[0xD] = 0x7F;
+	dispBuffer[0xF] = 0x00;
+	write(file, dispBuffer, 16);
+}
+
+//____________________
+void SetUp9(int file)
+{
+	unsigned char i, dispBuffer[16];
+	for (i=0; i<16; i++)
+		dispBuffer[i] = 0;
+
+	dispBuffer[0x1] = 0x00;
+	dispBuffer[0x3] = 0x00;
+	dispBuffer[0x5] = 0x7F;
+	dispBuffer[0x7] = 0x49;
+	dispBuffer[0x9] = 0x49;
+	dispBuffer[0xB] = 0x49;
+	dispBuffer[0xD] = 0x4F;
+	dispBuffer[0xF] = 0x00;
+	write(file, dispBuffer, 16);
 }
 
