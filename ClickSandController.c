@@ -16,6 +16,10 @@
 #include <signal.h>
 #include <sys/mman.h>
 
+#include <inttypes.h>
+#include <math.h>
+#include <time.h>
+
 #include <sys/ioctl.h>
 #include <linux/i2c.h>
 #include <linux/i2c-dev.h>
@@ -76,7 +80,15 @@ void SetUp6(int file);
 void SetUp7(int file);
 void SetUp8(int file);
 void SetUp9(int file);
+
 unsigned char running;
+
+// rmh
+long ms;
+time_t s;
+struct timespec spec;
+float myNow;
+
 
 //____________________
 int main(int argc, char *argv[])
@@ -215,32 +227,19 @@ int main(int argc, char *argv[])
 
                 case 11184813:						// 0xAAAAAD
 				case 19573421:						// 0x12AAAAD
-					tNow = Date.now();		// msec
-					tNow = date +%s%3N
-					
-					#include <time.h>
-					time_t currentTime;
-					currentTime = time(NULL);
-					printf("currentTime= %ld\n", currentTime);
-					
-					
-					#include <inttypes.h>
-					#include <math.h>
-					#include <stdio.h>
-					#include <time.h>
 
-					long ms;
-					time_t s;
-					struct timespec spec;
 					clock_gettime(CLOCK_REALTIME, &spec);
 					s = spec.tv_sec;
-					ms = round(spec.tv_nsec / 1.0e6); // Convert nanoseconds to milliseconds
-					if (ms >999) {
+					ms = (spec.tv_nsec / 1.0e6); // Convert nanoseconds to milliseconds
+					if (ms >999)
+					{
 						s++;
 						ms = 0;
 					}
-					printf("Current time: %"PRIdMAX".%03ld seconds since the Epoch\n",
-           (intmax_t)s, ms);
+//					printf("Current time: %"PRIdMAX".%03ld seconds since the Epoch\n", (intmax_t)s, ms);
+					myNow = s + ms/1000.0;
+					printf("myNow: %f\n", myNow);
+
 					
                     printf("1\n");
 					DisplayNumber(file, 1);
