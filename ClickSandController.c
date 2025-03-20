@@ -49,9 +49,9 @@ unsigned char dispBuffer[16];
 #define GPIOB  0x13
 
 // MCP output and "low" status
-#define OUTPUT  0x00
+#define OUTPUT	0x00
 #define ALL_OFF 0x00
-#define ALL_ON  0xFF
+#define ALL_ON	0xFF
 
 unsigned char mcpBuffer[2];			// Buffer for writes to MCP
 int mcp0;
@@ -66,7 +66,7 @@ void SetUp2Square(void);
 
 void McpAllOff(void);
 void McpAllOn(void);
-int  McpInit(void);
+int	 McpInit(void);
 void McpSendBytes(unsigned char byteA, unsigned char byteB);
 
 void DisplayNumber(int file, int guess);
@@ -81,14 +81,16 @@ void SetUp7(int file);
 void SetUp8(int file);
 void SetUp9(int file);
 
+void DoTimeTag(int n);
+int  CheckForEntryFinish(void);
+
+// Times in seconds
+#define TIME_BETWEEN_NUMBERS	1.5
+
+float lastTimeTag;
+int workingEntry, finishedEntry;
+
 unsigned char running;
-
-// rmh
-long ms;
-time_t s;
-struct timespec spec;
-float myNow;
-
 
 //____________________
 int main(int argc, char *argv[])
@@ -96,8 +98,8 @@ int main(int argc, char *argv[])
 	unsigned int *pru;		// Points to start of PRU memory
 	unsigned int theCmd, lastCmd;
 	unsigned int *pruDRAM_32int_ptr;
-	int	i, fd, file;
-   	char cmdBuffer[1];
+	int i, fd, file;
+	char cmdBuffer[1];
 
 	fd = open ("/dev/mem", O_RDWR | O_SYNC);
 	if (fd == -1)
@@ -114,8 +116,8 @@ int main(int argc, char *argv[])
 	close(fd);
 
 	// Set memory pointers
-	pru0DRAM_32int_ptr =     pru + PRU0_DRAM/4 + 0x200/4;	// Points to 0x200 of PRU0 memory
-	pru1DRAM_32int_ptr =     pru + PRU1_DRAM/4 + 0x200/4;	// Points to 0x200 of PRU1 memory
+	pru0DRAM_32int_ptr =	 pru + PRU0_DRAM/4 + 0x200/4;	// Points to 0x200 of PRU0 memory
+	pru1DRAM_32int_ptr =	 pru + PRU1_DRAM/4 + 0x200/4;	// Points to 0x200 of PRU1 memory
 	prusharedMem_32int_ptr = pru + PRU_SHAREDMEM/4;			// Points to start of shared memory
 
 	pruDRAM_32int_ptr = pru0DRAM_32int_ptr;
@@ -134,13 +136,13 @@ int main(int argc, char *argv[])
 	{
 		perror("*** Failed to open I2C bus dev file\n");
 		return EXIT_FAILURE;
-    }
+	}
 
 	if (ioctl(file, I2C_SLAVE, MATRIX_ADDR) < 0)
 	{
 		perror("*** Failed to connect to I2C device\n");
 		return EXIT_FAILURE;
-    }
+	}
 
 	// Internal system clock enable
 	cmdBuffer[0] = 0x21;
@@ -148,7 +150,7 @@ int main(int argc, char *argv[])
 		perror("*** Failed to send System Setup cmd: Device not present\n");
 
 	// Display on
-	cmdBuffer[0] = 0x81;        // no blink
+	cmdBuffer[0] = 0x81;		// no blink
 	write(file, cmdBuffer, 1);
 
 	// ROW/INT output pin set
@@ -165,12 +167,17 @@ int main(int argc, char *argv[])
 
 	(void) signal(SIGINT, myShutdown);
 
+	lastTimeTag = 0.0;
+	workingEntry = 0;
+	finishedEntry = -1;
+
 	running = 1;
 	lastCmd = 0;
 	printf("\nClickerDecoder Sandbox running...\n");
 	do
 	{
 		sleep(0.1);			// 1 command takes ~24 ms
+		CheckForEntryFinish();
 
 		theCmd = pruDRAM_32int_ptr[0];
 		if (theCmd != lastCmd)
@@ -196,118 +203,114 @@ int main(int argc, char *argv[])
 					break;
 
 				case 11185325:						// 0xAAACAD
-                case 19573933:						// 0x12AACAD
-                    printf("VOL\n");
-                    break;
+				case 19573933:						// 0x12AACAD
+					printf("VOL\n");
+					break;
 
 				case 11187027:						// 0xAAB353
-                case 19575635:						// 0x12AB353
-                    printf("MENU\n");
-                    break;
+				case 19575635:						// 0x12AB353
+					printf("MENU\n");
+					break;
 
 				case 11185323:						// 0xAAACAB
-                case 19573931:						// 0x12AACAB
-                    printf("VOL +\n");
-                    break;
+				case 19573931:						// 0x12AACAB
+					printf("VOL +\n");
+					break;
 
-                case 11184973:						// 0xAAAB4D
+				case 11184973:						// 0xAAAB4D
 				case 19573581:						// 0x12AAB4D
-                    printf("MUTE\n");
-                    break;
+					printf("MUTE\n");
+					break;
 
-                case 11186861:						// 0xAAB2AD
+				case 11186861:						// 0xAAB2AD
 				case 19575469:						// 0x12AB2AD
-                    printf("CH -\n");
-                    break;
+					printf("CH -\n");
+					break;
 
-                case 11186867:						// 0xAAB2B3
+				case 11186867:						// 0xAAB2B3
 				case 19575475:						// 0x12AB2B3
-                    printf("A/CH\n");
-                    break;
+					printf("A/CH\n");
+					break;
 
-                case 11184813:						// 0xAAAAAD
+				case 11184813:						// 0xAAAAAD
 				case 19573421:						// 0x12AAAAD
-
-					clock_gettime(CLOCK_REALTIME, &spec);
-					s = spec.tv_sec;
-					ms = (spec.tv_nsec / 1.0e6); // Convert nanoseconds to milliseconds
-					if (ms >999)
-					{
-						s++;
-						ms = 0;
-					}
-//					printf("Current time: %"PRIdMAX".%03ld seconds since the Epoch\n", (intmax_t)s, ms);
-					myNow = s + ms/1000.0;
-					printf("myNow: %f\n", myNow);
-
-					
-                    printf("1\n");
+					DoTimeTag(1);
+					printf("1\n");
 					DisplayNumber(file, 1);
-                    break;
+					break;
 
-                case 11184819:						// 0xAAAAB3
+				case 11184819:						// 0xAAAAB3
 				case 19573427:						// 0x12AAAB3
-                    printf("2\n");
+					DoTimeTag(2);
+					printf("2\n");
 					DisplayNumber(file, 2);
-                    break;
+					break;
 
-                case 11184821:						// 0xAAAAB5
+				case 11184821:						// 0xAAAAB5
 				case 19573429:						// 0x12AAAB5
-                    printf("3\n");
+					DoTimeTag(3);
+					printf("3\n");
 					DisplayNumber(file, 3);
-                    break;
+					break;
 
-                case 11184843:						// 0xAAAACB
+				case 11184843:						// 0xAAAACB
 				case 19573451:						// 0x12AAACB
-                    printf("4\n");
+					DoTimeTag(4);
+					printf("4\n");
 					DisplayNumber(file, 4);
-                    break;
+					break;
 
-                case 11184845:						// 0xAAAACD
+				case 11184845:						// 0xAAAACD
 				case 19573453:						// 0x12AAACD
-                    printf("5\n");
-                    DisplayNumber(file, 5);
-                    break;
+					DoTimeTag(5);
+					printf("5\n");
+					DisplayNumber(file, 5);
+					break;
 
-                case 11184851:						// 0xAAAAD3
+				case 11184851:						// 0xAAAAD3
 				case 19573459:						// 0x12AAAD3
-                    printf("6\n");
+					DoTimeTag(6);
+					printf("6\n");
 					DisplayNumber(file, 6);
-                    break;
+					break;
 
-                case 11184853:						// 0xAAAAD5
+				case 11184853:						// 0xAAAAD5
 				case 19573461:						// 0x12AAAD5
-                    printf("7\n");
-                    DisplayNumber(file, 7);
-                    break;
+					DoTimeTag(7);
+					printf("7\n");
+					DisplayNumber(file, 7);
+					break;
 
-                case 11184939:						// 0xAAAB2B
+				case 11184939:						// 0xAAAB2B
 				case 19573547:						// 0x12AAB2B
-                    printf("8\n");
+					DoTimeTag(8);
+					printf("8\n");
 					DisplayNumber(file, 8);
-                    break;
+					break;
 
-                case 11184941:						// 0xAAAB2D
+				case 11184941:						// 0xAAAB2D
 				case 19573549:						// 0x12AAB2D
-                    printf("9\n");
-                    DisplayNumber(file, 9);
-                    break;
+					DoTimeTag(9);
+					printf("9\n");
+					DisplayNumber(file, 9);
+					break;
 
-                case 11184811:						// 0xAAAAAB
+				case 11184811:						// 0xAAAAAB
 				case 19573419:						// 0x12AAAAB
-                    printf("0\n");
-                    DisplayNumber(file, 0);
-                    break;
+					DoTimeTag(0);
+					printf("0\n");
+					DisplayNumber(file, 0);
+					break;
 
-                case 11185491:						// 0xAAAD53
+				case 11185491:						// 0xAAAD53
 				case 19574099:						// 0x12AAD53
-                    printf("CC\n");
-                    break;
+					printf("CC\n");
+					break;
 
-                case 11186899:						// 0xAAB2D3
+				case 11186899:						// 0xAAB2D3
 				case 19575507:						// 0x12AB2D3
-                    printf("SLEEP\n");
-                    break;
+					printf("SLEEP\n");
+					break;
 
 				default:
 					printf("Unknown cmd: %d (0x%X)\n", theCmd, theCmd);
@@ -335,107 +338,105 @@ void myShutdown(int sig)
 //____________________
 void ClearDisplay(void)
 {
-    // Clear dispBuffer; note that every other byte is used
-    int i;
-    for (i=0; i<16; i++)
-        dispBuffer[i] = 0;
+	// Clear dispBuffer; note that every other byte is used
+	int i;
+	for (i=0; i<16; i++)
+		dispBuffer[i] = 0;
 }
 
 //____________________
 void SetUpX(void)
 {
-    dispBuffer[0x1] = 0xC0;
-    dispBuffer[0x3] = 0x21;
-    dispBuffer[0x5] = 0x12;
-    dispBuffer[0x7] = 0x0C;
-    dispBuffer[0x9] = dispBuffer[0x7];
-    dispBuffer[0xB] = dispBuffer[0x5];
-    dispBuffer[0xD] = dispBuffer[0x3];
-    dispBuffer[0xF] = dispBuffer[0x1];
+	dispBuffer[0x1] = 0xC0;
+	dispBuffer[0x3] = 0x21;
+	dispBuffer[0x5] = 0x12;
+	dispBuffer[0x7] = 0x0C;
+	dispBuffer[0x9] = dispBuffer[0x7];
+	dispBuffer[0xB] = dispBuffer[0x5];
+	dispBuffer[0xD] = dispBuffer[0x3];
+	dispBuffer[0xF] = dispBuffer[0x1];
 }
 
 //____________________
 void SetUp8Square(void)
 {
-    dispBuffer[0x1] = 0xFF;
-    dispBuffer[0x3] = 0xC0;
-    dispBuffer[0x5] = 0xC0;
-    dispBuffer[0x7] = 0xC0;
-    dispBuffer[0x9] = 0xC0;
-    dispBuffer[0xB] = 0xC0;
-    dispBuffer[0xD] = 0xC0;
-    dispBuffer[0xF] = 0xFF;
+	dispBuffer[0x1] = 0xFF;
+	dispBuffer[0x3] = 0xC0;
+	dispBuffer[0x5] = 0xC0;
+	dispBuffer[0x7] = 0xC0;
+	dispBuffer[0x9] = 0xC0;
+	dispBuffer[0xB] = 0xC0;
+	dispBuffer[0xD] = 0xC0;
+	dispBuffer[0xF] = 0xFF;
 }
 
 //____________________
 void SetUp6Square(void)
 {
-    dispBuffer[0x1] = 0x00;
-    dispBuffer[0x3] = 0x3F;
-    dispBuffer[0x5] = 0x21;
-    dispBuffer[0x7] = 0x21;
-    dispBuffer[0x9] = 0x21;
-    dispBuffer[0xB] = 0x21;
-    dispBuffer[0xD] = 0x3F;
-    dispBuffer[0xF] = 0x00;
+	dispBuffer[0x1] = 0x00;
+	dispBuffer[0x3] = 0x3F;
+	dispBuffer[0x5] = 0x21;
+	dispBuffer[0x7] = 0x21;
+	dispBuffer[0x9] = 0x21;
+	dispBuffer[0xB] = 0x21;
+	dispBuffer[0xD] = 0x3F;
+	dispBuffer[0xF] = 0x00;
 }
 
 //____________________
 void SetUp4Square(void)
 {
-    dispBuffer[0x1] = 0x00;
-    dispBuffer[0x3] = 0x00;
-    dispBuffer[0x5] = 0x1E;
-    dispBuffer[0x7] = 0x12;
-    dispBuffer[0x9] = 0x12;
-    dispBuffer[0xB] = 0x1E;
-    dispBuffer[0xD] = 0x00;
-    dispBuffer[0xF] = 0x00;
+	dispBuffer[0x1] = 0x00;
+	dispBuffer[0x3] = 0x00;
+	dispBuffer[0x5] = 0x1E;
+	dispBuffer[0x7] = 0x12;
+	dispBuffer[0x9] = 0x12;
+	dispBuffer[0xB] = 0x1E;
+	dispBuffer[0xD] = 0x00;
+	dispBuffer[0xF] = 0x00;
 }
 
 //____________________
 void SetUp2Square(void)
 {
-    dispBuffer[0x1] = 0x00;
-    dispBuffer[0x3] = 0x00;
-    dispBuffer[0x5] = 0x00;
-    dispBuffer[0x7] = 0x0C;
-    dispBuffer[0x9] = 0x0C;
-    dispBuffer[0xB] = 0x00;
-    dispBuffer[0xD] = 0x00;
-    dispBuffer[0xF] = 0x00;
+	dispBuffer[0x1] = 0x00;
+	dispBuffer[0x3] = 0x00;
+	dispBuffer[0x5] = 0x00;
+	dispBuffer[0x7] = 0x0C;
+	dispBuffer[0x9] = 0x0C;
+	dispBuffer[0xB] = 0x00;
+	dispBuffer[0xD] = 0x00;
+	dispBuffer[0xF] = 0x00;
 }
 
 //____________________
 void McpAllOff(void)
 {
-    // Sets all MCP outputs to 0
-    // This activates all relays
+	// Sets all MCP outputs to 0
+	// This activates all relays
 
-    mcpBuffer[0] = GPIOA;
-    mcpBuffer[1] = ALL_OFF;
-    write(mcp0, mcpBuffer, 2);
+	mcpBuffer[0] = GPIOA;
+	mcpBuffer[1] = ALL_OFF;
+	write(mcp0, mcpBuffer, 2);
 
-    mcpBuffer[0] = GPIOB;
-    mcpBuffer[1] = ALL_OFF;
-    write(mcp0, mcpBuffer, 2);
+	mcpBuffer[0] = GPIOB;
+	mcpBuffer[1] = ALL_OFF;
+	write(mcp0, mcpBuffer, 2);
 }
 
 //____________________
 void McpAllOn(void)
 {
-    // Sets all MCP outputs to 1
-    // This deactivates all relays
+	// Sets all MCP outputs to 1
+	// This deactivates all relays
 
-    mcpBuffer[0] = GPIOA;
-    mcpBuffer[1] = ALL_ON;
-    write(mcp0, mcpBuffer, 2);
+	mcpBuffer[0] = GPIOA;
+	mcpBuffer[1] = ALL_ON;
+	write(mcp0, mcpBuffer, 2);
 
-    mcpBuffer[0] = GPIOB;
-    mcpBuffer[1] = ALL_ON;
-    write(mcp0, mcpBuffer, 2);
-
-//    printf("McpAllOn\n");
+	mcpBuffer[0] = GPIOB;
+	mcpBuffer[1] = ALL_ON;
+	write(mcp0, mcpBuffer, 2);
 }
 
 //____________________
@@ -452,16 +453,16 @@ int McpInit(void)
 
 	// Initialize 1st MCP23017 with 0x20 address:
 	mcp0 = open("/dev/i2c-2", O_RDWR);
-    if (mcp0 < 0)
-    {
-        perror("*** Failed to open I2C bus file for MCP device\n");
-        return -1;
-    }
+	if (mcp0 < 0)
+	{
+		perror("*** Failed to open I2C bus file for MCP device\n");
+		return -1;
+	}
 	if (ioctl(mcp0, I2C_SLAVE, MCP_ADDR0) < 0)
-    {
-        perror("*** Failed to connect to MCP\n");
-        return -1;
-    }
+	{
+		perror("*** Failed to connect to MCP\n");
+		return -1;
+	}
 
 	/*
 		Writing bytes to registers:
@@ -492,7 +493,7 @@ int McpInit(void)
 
 	// Initialize all outputs to 0 to deactivate relays
 	McpAllOff();
-    return 0;
+	return 0;
 }
 
 //____________________
@@ -718,3 +719,58 @@ void SetUp9(int file)
 	write(file, dispBuffer, 16);
 }
 
+//____________________
+void DoTimeTag(int n)
+{
+	// Updates workingEntry and lastTimeTag
+	// Called when numeral entered
+	
+	long ms;
+	time_t s;
+	struct timespec spec;
+
+	clock_gettime(CLOCK_REALTIME, &spec);
+	s = spec.tv_sec;
+	ms = (spec.tv_nsec / 1.0e6);		// convert nanoseconds to milliseconds
+	if (ms >999)
+	{
+		s++;
+		ms = 0;
+	}
+//	printf("Current time: %"PRIdMAX".%03ld seconds since the Epoch\n", (intmax_t)s, ms);
+	lastTimeTag = s + ms/1000.0;
+	workingEntry = 10*workingEntry + n;
+	printf("workingEntry= %d\n", workingEntry);
+}
+
+//____________________
+int CheckForEntryFinish(void)
+{
+	// Determines if enough time has elapsed to declare entry finished
+	// Called very often
+	
+	long ms;
+	time_t s;
+	struct timespec spec;
+	float currentTime;
+
+	clock_gettime(CLOCK_REALTIME, &spec);
+	s = spec.tv_sec;
+	ms = (spec.tv_nsec / 1.0e6);		// convert nanoseconds to milliseconds
+	if (ms >999)
+	{
+		s++;
+		ms = 0;
+	}
+	currentTime = s + ms/1000.0;
+	if ((currentTime - lastTimeTag) > TIME_BETWEEN_NUMBERS)
+	{
+		finishedEntry = workingEntry;
+		printf("Finished number: %d\n", finishedEntry);
+
+		workingEntry = 0;
+		return finishedEntry;
+	}
+	else
+		return -1;
+}
