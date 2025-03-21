@@ -87,8 +87,9 @@ int  CheckForEntryFinish(void);
 // Times in seconds
 #define TIME_BETWEEN_NUMBERS	1.5
 
-float lastTimeTag;
+double lastTimeTag;
 int workingEntry, finishedEntry;
+unsigned char numberInProgress;
 
 unsigned char running;
 
@@ -170,6 +171,7 @@ int main(int argc, char *argv[])
 	lastTimeTag = 0.0;
 	workingEntry = 0;
 	finishedEntry = -1;
+	numberInProgress = 0;
 
 	running = 1;
 	lastCmd = 0;
@@ -177,7 +179,8 @@ int main(int argc, char *argv[])
 	do
 	{
 		sleep(0.1);			// 1 command takes ~24 ms
-		CheckForEntryFinish();
+		if (numberInProgress)
+			CheckForEntryFinish();
 
 		theCmd = pruDRAM_32int_ptr[0];
 		if (theCmd != lastCmd)
@@ -204,7 +207,7 @@ int main(int argc, char *argv[])
 
 				case 11185325:						// 0xAAACAD
 				case 19573933:						// 0x12AACAD
-					printf("VOL\n");
+					printf("VOL -\n");
 					break;
 
 				case 11187027:						// 0xAAB353
@@ -724,7 +727,7 @@ void DoTimeTag(int n)
 {
 	// Updates workingEntry and lastTimeTag
 	// Called when numeral entered
-	
+
 	long ms;
 	time_t s;
 	struct timespec spec;
@@ -739,8 +742,10 @@ void DoTimeTag(int n)
 	}
 //	printf("Current time: %"PRIdMAX".%03ld seconds since the Epoch\n", (intmax_t)s, ms);
 	lastTimeTag = s + ms/1000.0;
+//	printf("lastTimeTag= %f\n", lastTimeTag);
 	workingEntry = 10*workingEntry + n;
-	printf("workingEntry= %d\n", workingEntry);
+//	printf("workingEntry= %d\n", workingEntry);
+	numberInProgress = 1;
 }
 
 //____________________
@@ -748,11 +753,11 @@ int CheckForEntryFinish(void)
 {
 	// Determines if enough time has elapsed to declare entry finished
 	// Called very often
-	
+
 	long ms;
 	time_t s;
 	struct timespec spec;
-	float currentTime;
+	double currentTime;
 
 	clock_gettime(CLOCK_REALTIME, &spec);
 	s = spec.tv_sec;
@@ -766,6 +771,7 @@ int CheckForEntryFinish(void)
 	if ((currentTime - lastTimeTag) > TIME_BETWEEN_NUMBERS)
 	{
 		finishedEntry = workingEntry;
+		numberInProgress = 0;
 		printf("Finished number: %d\n", finishedEntry);
 
 		workingEntry = 0;
